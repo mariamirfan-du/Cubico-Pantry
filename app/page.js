@@ -68,6 +68,7 @@ const Page = () => {
           onClick={() => router.push('/inventory')}
         >
           Lets Manage
+            
         </Button>
 
       </Box>
