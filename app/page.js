@@ -61,13 +61,13 @@ const Page = () => {
         <Typography variant="h5" component="p" sx={{ marginTop: 2 }}>
           CUBICO PANTRY
         </Typography>
-        <Typography variant= "h6" component="p" sx={{ marginTop: "auto", fontStyle: 'italic' }}>"The only way to manage"</Typography>
+        <Typography variant= "h6" component="p" sx={{ marginTop: "auto", fontStyle: 'italic' }}>The only way to manage</Typography>
         <Button
           variant="contained"
           sx={{ bgcolor:"#043A4A !important",color:"#fff",'&:hover': { backgroundColor: '#0A416E !important'},marginTop: 2}}
           onClick={() => router.push('/inventory')}
         >
-          Let's Manage
+          Lets Manage
         </Button>
 
       </Box>
