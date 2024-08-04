@@ -16,7 +16,7 @@ const Page = () => {
         alignItems: "center",
         justifyContent: "center",
         minHeight: "100vh",
-        backgroundImage: "url('home_bg4.jpg')", // Replace with your image URL
+        backgroundImage: "url('home_bg.jpg')", // Replace with your image URL
         backgroundSize: "cover",
         backgroundPosition: "center",
         position: "relative",
