@@ -4,7 +4,7 @@ import { firestore } from "@/firebase";
 import {Box, Button, Modal, Stack, TextField, Typography,Autocomplete, Drawer, Card, CardMedia, CardContent} from "@mui/material";
 import axios from 'axios';
 import {collection, doc, getDocs, getDoc, query,deleteDoc, setDoc} from "firebase/firestore";
-import { createClient } from 'pexels';
+
 
 
 const PEXELS_API_KEY = createClient(process.env.NEXT_PUBLIC_PEXELS_API_KEY);
