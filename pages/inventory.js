@@ -93,7 +93,8 @@ export default function Inventory() {
     setOpen(false);
     setItemName("");
     setQuantity("")
-    setCategory(""); // Reset category selection when closing the modal
+    setCategory("");
+    setImageSrc("");// Reset category selection when closing the modal
   };
 
   const toggleDrawer = (open) => () => {
@@ -188,6 +189,7 @@ export default function Inventory() {
       updateInventory();
       handleClose();
       closeCamera();
+      setImageSrc(""); 
     } catch (error) {
       console.error("Error adding document: ", error);
     }
