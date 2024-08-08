@@ -7,7 +7,7 @@ import {collection, doc, getDocs, getDoc, query,deleteDoc, setDoc} from "firebas
 
 
 
-const PEXELS_API_KEY = createClient(process.env.NEXT_PUBLIC_PEXELS_API_KEY);
+// const PEXELS_API_KEY = createClient(process.env.NEXT_PUBLIC_PEXELS_API_KEY);
 
 const fetchImageUrl = async (itemName) => {
   try {
