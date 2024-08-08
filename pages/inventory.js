@@ -1,19 +1,13 @@
 "use client";
 import { useState, useEffect, useCallback , useRef } from "react";
 import { firestore } from "@/firebase";
-import {
-  Box, Button, Modal, Stack, TextField, Typography,
-  Autocomplete, Drawer, Card, CardMedia, CardContent
-} from "@mui/material";
+import {Box, Button, Modal, Stack, TextField, Typography,Autocomplete, Drawer, Card, CardMedia, CardContent} from "@mui/material";
 import axios from 'axios';
-import {
-  collection, doc, getDocs, getDoc, query,
-  deleteDoc, setDoc
-} from "firebase/firestore";
+import {collection, doc, getDocs, getDoc, query,deleteDoc, setDoc} from "firebase/firestore";
+import { createClient } from 'pexels';
 
-// OpenAI API key and endpoint (make sure to replace 'YOUR_OPENAI_API_KEY' with your actual key)
-const OPENAI_API_KEY = 'YOUR_OPENAI_API_KEY';
-const PEXELS_API_KEY = 'YOUR_PEXELS_API_KEY'; // Replace with your Pexels API key
+
+const PEXELS_API_KEY = createClient(process.env.NEXT_PUBLIC_PEXELS_API_KEY);
 
 const fetchImageUrl = async (itemName) => {
   try {
@@ -51,6 +45,12 @@ export default function Inventory() {
   const [category, setCategory] = useState("");
   const [categories, setCategories] = useState([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [openCamera, setOpenCamera] = useState(false);
+  const [imageSrc, setImageSrc] = useState(null);
+  const [ quantity , setQuantity ] = useState("")
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+
 
   const updateInventory = useCallback(async () => {
     try {
@@ -68,39 +68,6 @@ export default function Inventory() {
   useEffect(() => {
     updateInventory();
   }, [updateInventory]);
-
-  const addItem = async () => {
-    try {
-      if (!category) {
-        alert('Please select a category.');
-        return;
-      }
-      const imageUrl = await fetchImageUrl(itemName);
-      const docRef = doc(collection(firestore, "inventory"), itemName);
-      const docSnap = await getDoc(docRef);
-      
-      if (docSnap.exists()) {
-        const { quantity } = docSnap.data();
-        await setDoc(docRef, { quantity: quantity + 1 }, { merge: true });
-      } else {
-        await setDoc(docRef, { quantity: 1, category, imageUrl });
-      }
-      updateInventory();
-      handleClose();
-    } catch (error) {
-      console.error("Error adding item:", error);
-    }
-  }
-
-  const deleteItem = async (item) => {
-    try {
-      const docRef = doc(collection(firestore, "inventory"), item);
-      await deleteDoc(docRef);
-      updateInventory();
-    } catch (error) {
-      console.error("Error deleting item:", error);
-    }
-  }
 
   const handleSearch = (event, value) => {
     setFilteredItems(value 
@@ -125,6 +92,7 @@ export default function Inventory() {
   const handleClose = () => {
     setOpen(false);
     setItemName("");
+    setQuantity("")
     setCategory(""); // Reset category selection when closing the modal
   };
 
@@ -149,47 +117,96 @@ export default function Inventory() {
     }
   };
 
-  const videoRef = useRef(null);
-  const photoRef = useRef(null);
-  const [isCameraOpen, setIsCameraOpen] = useState(false);
-  const [imageSrc, setImageSrc] = useState(null);
 
-  const openCamera = async () => {
-    setIsCameraOpen(true);
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      videoRef.current.srcObject = stream;
-      videoRef.current.play();
+  const openCameraModal = () => setOpenCamera(true);
+
+  //Function for closing camera modal 
+
+  const closeCameraModal = () => {
+    const stream = videoRef.current?.srcObject;
+    if (stream) {
+      const tracks = stream.getTracks();
+      tracks.forEach(track => track.stop());
+    }
+    videoRef.current.srcObject = null;
+    setOpenCamera(false);
+  };
+//Function for capturing pictures 
+  const captureImage = () => {
+    const context = canvasRef.current?.getContext("2d");
+    if (videoRef.current && context) {
+      context.drawImage(videoRef.current, 0, 0, canvasRef.current.width, canvasRef.current.height);
+      const imageDataURL = canvasRef.current.toDataURL("image/png");
+      setImageSrc(imageDataURL);
+      closeCameraModal();
+      handleOpen();
     }
   };
 
-  const closeCamera = () => {
-    const stream = videoRef.current.srcObject;
-    const tracks = stream.getTracks();
+  useEffect(() => {
+    if (openCamera) {
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then((stream) => {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+        })
+        .catch((err) => {
+          console.error("Error accessing camera: ", err);
+        });
+    }
+  }, [openCamera]);
 
-    tracks.forEach(track => {
-      track.stop();
-    });
+//Function to update items in inventory 
+  const uploadImage = async () => {
+    if (!itemName || !quantity || !category) {
+      alert("Please provide all details before uploading.");
+      return;
+    }
 
-    videoRef.current.srcObject = null;
-    setIsCameraOpen(false);
+    try {
+      const docRef = doc(collection(firestore, "inventory"), itemName);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const { quantity: existingQuantity } = docSnap.data();
+        await setDoc(docRef, {
+          imageUrl: imageSrc,
+          name: itemName,
+          quantity: existingQuantity + parseInt(quantity, 10),
+          category,
+          createdAt: new Date()
+        }, { merge: true });
+      } else {
+        await setDoc(docRef, {
+          imageUrl: imageSrc,
+          name: itemName,
+          quantity: parseInt(quantity, 10),
+          category,
+          createdAt: new Date()
+        });
+      }
+      console.log("Document successfully written!");
+      updateInventory();
+      handleClose();
+      closeCamera();
+    } catch (error) {
+      console.error("Error adding document: ", error);
+    }
   };
 
-  const takePicture = () => {
-    const width = 640;
-    const height = 480;
-    const context = photoRef.current.getContext('2d');
-    photoRef.current.width = width;
-    photoRef.current.height = height;
-    context.drawImage(videoRef.current, 0, 0, width, height);
-    const dataURL = photoRef.current.toDataURL('image/png');
-    setImageSrc(dataURL);
-  };
 
-  
-
+//Function to delete inventory item
+  const deleteItem = async (item) => {
+    try {
+      const docRef = doc(collection(firestore, "inventory"), item);
+      await deleteDoc(docRef);
+      updateInventory();
+    } catch (error) {
+      console.error("Error deleting item:", error);
+    }
+  }
 
 
+// --------------------------------------------Main body starting -------------------------------------------------------//
   return (
     <Box
       width="100%"
@@ -295,7 +312,64 @@ export default function Inventory() {
           </Stack>
         </Box>
       </Drawer>
-      
+      {/*-----------------------------------------category hamburg closed-----------------------------------------------------  */}
+
+
+      {/* ----------------------------------------Selected content Title------------------------------------------------------------ */}
+      <Box display='flex' justifyContent="space-between" width={400}>
+      <Typography variant="h5" sx={{ mt: "50px", color: '#000000'  , display:"flex-start"}}> {/* Text color */}
+        {category && category !== "all" ? `Category: ${category.charAt(0).toUpperCase() + category.slice(1)}` : "All Items"}
+      </Typography>
+
+      <Button
+        variant="contained"
+        color="primary"
+        onClick={handleOpen}
+        sx={{ marginTop: '40px', bgcolor: '#b7b5b3', color: '#000000' }} // Primary color and Text color
+      >
+        Add Item
+      </Button>
+
+      <Button
+        variant="contained"
+        color="primary"
+        onClick={openCameraModal}
+        sx={{ marginTop: '40px', bgcolor: '#b7b5b3', color: '#000000' }} // Primary color and Text color
+      >
+        scan
+      </Button>
+        {/*----------------------------------- Modal for Camera----------------------------------------------------- */}
+
+        <Modal
+        open={openCamera}
+        onClose={closeCameraModal}
+        sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}
+      >
+        <Box
+          sx={{
+            bgcolor: 'white',
+            padding: 2,
+            borderRadius: 1,
+            boxShadow: 3,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center'
+          }}
+        >
+          <Typography variant="h6" gutterBottom>
+            Capture Image
+          </Typography>
+          <video ref={videoRef} autoPlay width="320" height="240" style={{ border: '1px solid black' }} />
+          <canvas ref={canvasRef} width="320" height="240" style={{ display: 'none' }} />
+          <Button onClick={captureImage} variant="contained" color="primary" sx={{ marginTop: 2 }}>
+            Capture
+          </Button>
+          <Button onClick={closeCameraModal} variant="contained" color="primary" sx={{marginTop:2}}>close</Button>
+        </Box>
+      </Modal>
+{/* --------------------------------------------Camera Model Ends------------------------------------------------------------- */}
+
+{/* ----------------------------------------------Add Item PopUp----------------------------------------------------------------- */}
       <Modal open={open} onClose={handleClose}>
         <Box
           position="absolute"
@@ -313,7 +387,15 @@ export default function Inventory() {
           sx={{ transform: "translate(-50%, -50%)" }}
         >
           <Typography variant="h6" >Add Item</Typography>
+          
+          {imageSrc && (
+            <Box sx={{ marginBottom: 2, textAlign: 'center' }}>
+              <img src={imageSrc} alt="Captured" style={{ maxWidth: '100%', height: 'auto' }} />
+            </Box>
+          )}
+
           <Stack width="100%" direction="column" spacing={2}>
+
             <TextField
               variant="outlined"
               fullWidth
@@ -321,42 +403,28 @@ export default function Inventory() {
               onChange={(e) => setItemName(e.target.value)}
               label="Item Name"
             />
+             <TextField
+                label="Quantity"
+                type="number"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                fullWidth
+                sx={{ mt: 2 }}
+              />
             <Autocomplete
               options={['vegetables', 'fruits', 'herbs and spices', 'meat items', 'dairy', 'sauces', 'oils', 'baking', 'canned and prepared']}
               value={category}
               onChange={(event, newValue) => setCategory(newValue)}
               renderInput={(params) => <TextField {...params} label="Category" variant="outlined" />}
             />
-            <Button onClick={addItem} variant="contained" sx={{ bgcolor: '#b7b5b3', color: '#000000' }}> {/* Primary color and Text color */}
+            <Button onClick={uploadImage} variant="contained" sx={{ bgcolor: '#b7b5b3', color: '#000000' }}> {/* Primary color and Text color */}
               Add
             </Button>
           </Stack>
         </Box>
       </Modal>
-      <Box display='flex' justifyContent="space-between" width={400}>
-      <Typography variant="h5" sx={{ mt: "50px", color: '#000000' }}> {/* Text color */}
-        {category && category !== "all" ? `Category: ${category.charAt(0).toUpperCase() + category.slice(1)}` : "All Items"}
-      </Typography>
-
-      <Button
-        variant="contained"
-        color="primary"
-        onClick={handleOpen}
-        sx={{ marginTop: '40px', bgcolor: '#b7b5b3', color: '#000000' }} // Primary color and Text color
-      >
-        Add Item
-      </Button>
-
-      <Button
-        variant="contained"
-        color="primary"
-        onClick={takePicture}
-        sx={{ marginTop: '40px', bgcolor: '#b7b5b3', color: '#000000' }} // Primary color and Text color
-      >
-        scan
-      </Button>
-
-      </Box>
+{/* ----------------------------------------------AddItem Pop Up Ends-------------------------------------------------- */}
+    </Box>
 
       <Stack spacing={2} width="60%" marginTop="50px">
         {filteredItems.map((item) => (
@@ -398,7 +466,7 @@ export default function Inventory() {
                 variant="contained"
                 color="error"
                 onClick={() => deleteItem(item.name)}
-                sx={{ bgcolor: '#b7b5b3', color: '#000000' }} // Primary color and Text color
+                sx={{ bgcolor: '#b7b5b3', color: '#000000' ,'&:hover': { backgroundColor: '#0A416E !important'}}} // Primary color and Text color
               >
                 Delete
               </Button>
